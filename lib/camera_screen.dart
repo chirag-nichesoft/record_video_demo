@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:ext_storage/ext_storage.dart';
@@ -26,6 +27,7 @@ class _CameraScreenState extends State<CameraScreen> {
   static int filename = 0;
   Timer timer;
   String foldername;
+  bool canCheck = true;
 
   @override
   Future<void> initState() {
@@ -40,6 +42,7 @@ class _CameraScreenState extends State<CameraScreen> {
     });
     findFolderName();
   }
+
   Future<void> findFolderName() async
   {
     String _foldername = await folderName();
@@ -47,13 +50,8 @@ class _CameraScreenState extends State<CameraScreen> {
       foldername =_foldername;
     });
     print("*************************$foldername");
-
   }
-  /*@override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }*/
+
 
   _initCamera(CameraDescription camera) async {
     print("------------------------------------------------------------------------->init camera 39");
@@ -73,6 +71,7 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 
+
   Widget _buildControls() {
     print("------------------------------------------------------------------------->build controlles 57");
     return Row(
@@ -85,11 +84,11 @@ class _CameraScreenState extends State<CameraScreen> {
         IconButton(
           icon: Icon(Icons.radio_button_checked),
           // onPressed: _isRecording ? null : _onRecord,
-          onPressed: _onPrepareForRecord,
+          onPressed:_onPrepareForRecord,
         ),
         IconButton(
           icon: Icon(Icons.stop),
-          onPressed: _isRecording ? _onStop : null,
+          onPressed: checkForStop,
         ),
         IconButton(
           icon: Icon(Icons.play_arrow),
@@ -101,47 +100,74 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _onPlay() => OpenFile.open(_filePath);
 
-  Future<void> _onStop() async {
-    print("------------------------------------------------------------------------->onStop 84");
-    await _controller.stopVideoRecording();
-    int uploadFileIndex=filename-1;
-    var directory = await getExternalStorageDirectory();
-    String _filePath = directory.path + '/'+uploadFileIndex.toString()+'.mp4';
-    //timer.cancel();
-    setState(() => _isRecording = false);
-    uploadFileFromGallery(_filePath);
-  }
-  _onPrepareForRecord()
-  {
-    timer = Timer.periodic(Duration(seconds: 15), (Timer t) => _onRecord());
-    Timer.periodic(Duration(seconds: 15), (Timer t) => _onStop());
-  }
-
   Future<void> _onRecord() async {
     print("------------------------------------------------------------------------->onRecord 90");
-    // timer = Timer.periodic(Duration(seconds: 10), (Timer t) => _onRecord());
     var directory = await getExternalStorageDirectory();
-    // _filePath = directory.path + '/chirag/${DateTime.now()}.mp4';
-    // _filePath = directory.path + '/${DateTime.now()}.mp4';
     _filePath = directory.path + '/'+filename.toString()+'.mp4';
-    setState(() {
-      filename++;
-    });
-    //String s = await _getPathToDownload();
-    // _filePath =  s + '/${DateTime.now()}.mp4';
+    filename++;
     print("file path is -> $_filePath");
-    //print("file path is -> ${directory.absolute} ");
     _controller.startVideoRecording(_filePath);
-    setState(() => _isRecording = true);
-
-    print("-----------after recording----------");
-
-
-    /*sleep1();
-    _onRecord();*/
-
-
+    //setState(() => _isRecording = true);
+    await new Future.delayed(const Duration(seconds : 5));
+    _onStop(_filePath);
   }
+
+  Future<void> _onStop(String _filePath) async {
+    print("------------------------------------------------------------------------->onStop 84");
+    await _controller.stopVideoRecording();
+    uploadFileFromGallery(_filePath);
+    if(canCheck)
+    {
+      _onRecord();
+    }
+  }
+   /*_onPrepareForRecord()
+  {
+    timer = Timer.periodic(Duration(seconds: 15), (Timer t) => _onRecord());
+    Timer.periodic(Duration(seconds: 16), (Timer t) => _onStop());
+  }*/
+   checkForStop()
+   {
+
+     print("stoppingggggggggggggggggggggggggggggggggggggggggggggggggggggggggg");
+     setState(() {
+       canCheck = false;
+     });
+     //_onStop();
+
+   }
+  _onPrepareForRecord()
+  {
+    //timer = Timer.periodic(Duration(seconds: 5), (Timer t) => check1());
+    //check1();
+    _onRecord();
+  }
+  Future<void> check1() async
+  {
+    filename++;
+    print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%---check_record $filename");
+    DateTime _now = DateTime.now();
+    print('timestamp: ${_now.hour}:${_now.minute}:${_now.second}.${_now.millisecond}');
+
+    //Timer.periodic(Duration(seconds: 5), (Timer t) => check2());
+    //sleep(const Duration(seconds: 5));
+    await new Future.delayed(const Duration(seconds : 5));
+    //timer = Timer.periodic(Duration(seconds: 5), (Timer t) => check2());
+    check2();
+  }
+  void check2()
+  {
+    print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%---check_stop $filename");
+    DateTime _now = DateTime.now();
+    print('timestamp: ${_now.hour}:${_now.minute}:${_now.second}.${_now.millisecond}');
+    folderName();
+    if(canCheck)
+    {
+      check1();
+    }
+  }
+
+
 
   IconData _getCameraIcon(CameraLensDirection lensDirection) {
     print("------------------------------------------------------------------------->Icon data 113");
@@ -162,7 +188,8 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<Response> uploadFileFromGallery(String path) async {
-    String key = foldername+'/'+filename.toString()+".mp4";
+    //String key = foldername+'/'+filename.toString()+".mp4";
+    String key = foldername+"/"+path.split("/").last;
     var url = 'https://ace-upload-sessionvideo.s3.ap-south-1.amazonaws.com/';
     var request = http.MultipartRequest('POST', Uri.parse(url));
     request.files.add(await http.MultipartFile.fromPath('file', path));
@@ -196,6 +223,7 @@ class _CameraScreenState extends State<CameraScreen> {
     }
     Map<String,dynamic> strResponse = convert.jsonDecode(response.body);
     String folderName = strResponse['id'];
+    print("----------------------------------- folderName is "+folderName);
     return folderName;
   }
 
